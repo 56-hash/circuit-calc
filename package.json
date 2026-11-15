@@ -1,0 +1,18 @@
+{
+  "name": "circuit-calc",
+  "version": "1.0.0",
+  "description": "손글씨 회로 수식 인식 + 공학용 계산 PWA",
+  "scripts": {
+    "test": "node --test test/engine.test.js test/crosscheck.test.js test/recognizer.test.js test/ui.test.js",
+    "test:engine": "node --test test/engine.test.js test/crosscheck.test.js test/recognizer.test.js",
+    "start": "node tools/serve.mjs"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "katex": "^0.19.1"
+  },
+  "private": true
+}

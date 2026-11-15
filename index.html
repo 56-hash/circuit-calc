@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1f4e79">
+<title>회로 손글씨 계산기</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="vendor/katex/katex.min.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="topbar">
+  <h1>회로 손글씨 계산기</h1>
+  <nav class="tabs" role="tablist" aria-label="화면">
+    <button role="tab" data-tab="calc" aria-selected="true">계산</button>
+    <button role="tab" data-tab="history" aria-selected="false">기록</button>
+    <button role="tab" data-tab="settings" aria-selected="false">설정</button>
+  </nav>
+</header>
+
+<main>
+  <!-- 계산 화면 -->
+  <section id="tab-calc" class="tab" role="tabpanel">
+    <div class="toolbar">
+      <div class="seg" id="seg-mode" role="group" aria-label="계산 모드">
+        <button data-mode="step" title="한 줄씩 위에서 아래로, 앞 결과를 이어서 사용">직렬</button>
+        <button data-mode="batch" title="체크한 줄을 한꺼번에: 대입 수집 후 연립식 풀이">일괄</button>
+      </div>
+      <div class="seg" id="seg-angle" role="group" aria-label="각도 단위">
+        <button data-angle="deg">DEG</button>
+        <button data-angle="rad">RAD</button>
+      </div>
+      <div class="seg" id="seg-fmt" role="group" aria-label="복소수 표시">
+        <button data-fmt="rect" title="a + jb">직교</button>
+        <button data-fmt="polar" title="r∠θ">극</button>
+        <button data-fmt="both">둘 다</button>
+      </div>
+      <label class="chip"><input type="checkbox" id="chk-eng"> 공학 표기</label>
+      <label class="chip"><input type="checkbox" id="chk-keep"> 환경 유지</label>
+      <button id="btn-vars" class="btn ghost">변수 <span id="var-count" class="badge">0</span></button>
+    </div>
+
+    <div class="inputbar">
+      <button id="btn-pick" class="btn">이미지 선택</button>
+      <button id="btn-paste" class="btn">붙여넣기</button>
+      <button id="btn-draw" class="btn">필기</button>
+      <button id="btn-text" class="btn">직접 입력</button>
+      <input type="file" id="file-input" accept="image/*" hidden>
+      <span id="status" class="status" role="status" aria-live="polite"></span>
+    </div>
+
+    <details id="image-panel" class="imagepanel" hidden>
+      <summary>원본 이미지</summary>
+      <img id="img-preview" alt="공유된 원본 이미지">
+    </details>
+
+    <div id="unreadable" class="notice" hidden></div>
+
+    <ol id="lines" class="lines" aria-label="인식된 줄"></ol>
+    <div id="empty" class="empty">
+      <p>AI 셀렉트로 노트의 풀이 영역을 선택한 뒤 <strong>공유 → 회로 손글씨 계산기</strong>를 고르세요.</p>
+      <p class="sub">또는 위의 버튼으로 이미지를 고르거나, 직접 입력하세요.</p>
+      <button id="btn-demo" class="btn ghost">데모 불러오기</button>
+    </div>
+    <div class="addrow"><button id="btn-add" class="btn ghost">+ 줄 추가</button></div>
+  </section>
+
+  <!-- 기록 화면 -->
+  <section id="tab-history" class="tab" role="tabpanel" hidden>
+    <div class="row between"><h2>기록</h2><button id="btn-clear-history" class="btn ghost danger">전체 삭제</button></div>
+    <ul id="history-list" class="history"></ul>
+    <p id="history-empty" class="empty sub">저장된 기록이 없습니다.</p>
+  </section>
+
+  <!-- 설정 화면 -->
+  <section id="tab-settings" class="tab" role="tabpanel" hidden>
+    <h2>설정</h2>
+    <form id="settings-form" class="form" autocomplete="off">
+      <fieldset>
+        <legend>인식</legend>
+        <label>인식 방식
+          <select name="provider">
+            <option value="anthropic">Claude 비전 API</option>
+            <option value="mock">데모(모의 인식, 키 불필요)</option>
+          </select>
+        </label>
+        <label>API 키
+          <input type="password" name="apiKey" placeholder="sk-ant-..." autocomplete="off" spellcheck="false">
+        </label>
+        <p class="hint">키는 이 기기의 브라우저 저장소에만 보관되며, 인식 요청 때 Anthropic 서버로만 전송됩니다. 개인 기기에서만 사용하세요.</p>
+        <label>모델 이름 <input type="text" name="model" spellcheck="false"></label>
+        <label>타임아웃(초) <input type="number" name="timeoutSec" min="5" max="120"></label>
+        <label class="inline"><input type="checkbox" name="autoRun"> 인식 직후 자동으로 실행</label>
+      </fieldset>
+      <fieldset>
+        <legend>계산</legend>
+        <label>유효숫자 <input type="number" name="digits" min="3" max="12"></label>
+      </fieldset>
+      <fieldset>
+        <legend>기록</legend>
+        <label>보관 기간(일) <input type="number" name="retentionDays" min="1" max="365"></label>
+      </fieldset>
+      <p id="settings-saved" class="hint" role="status"></p>
+    </form>
+  </section>
+</main>
+
+<div id="actionbar" class="actionbar">
+  <div id="act-step" class="acts">
+    <button id="btn-run-one" class="btn primary" title="현재 줄 실행 후 다음 줄로">▶ 실행</button>
+    <button id="btn-skip" class="btn" title="실행하지 않고 다음 줄로">건너뛰기 ⏭</button>
+    <button id="btn-run-rest" class="btn" title="남은 줄을 끝까지 실행">⏩ 끝까지</button>
+    <button id="btn-reset-step" class="btn ghost" title="결과와 변수를 지우고 처음으로">⟲ 처음으로</button>
+  </div>
+  <div id="act-batch" class="acts" hidden>
+    <button id="btn-run-batch" class="btn primary">실행 (체크한 줄 일괄)</button>
+    <button id="btn-reset-batch" class="btn ghost">⟲ 결과 지우기</button>
+  </div>
+</div>
+
+<!-- 변수 서랍 -->
+<aside id="vars-drawer" class="drawer" hidden aria-label="변수">
+  <div class="row between"><h2>변수</h2><button id="btn-vars-close" class="btn ghost">닫기</button></div>
+  <ul id="vars-list" class="varlist"></ul>
+  <form id="vars-form" class="row">
+    <input name="vname" placeholder="이름 (예: R1)" spellcheck="false" aria-label="변수 이름" required>
+    <input name="vexpr" placeholder="값 또는 식 (예: 4.7k)" spellcheck="false" aria-label="변수 값" required>
+    <button class="btn">추가</button>
+  </form>
+  <p id="vars-msg" class="hint"></p>
+</aside>
+
+<!-- 직접 입력 대화상자 -->
+<dialog id="dlg-text">
+  <form method="dialog" class="dlg">
+    <h2>직접 입력</h2>
+    <p class="hint">한 줄에 하나씩 입력하세요. 허수는 j, 극형식은 10@30deg 또는 10∠30°, 병렬은 R1||R2.</p>
+    <textarea id="text-input" rows="8" spellcheck="false" placeholder="10@30deg + 5@(-45deg)&#10;(3+j4)||(6-j8)"></textarea>
+    <div class="row end"><button value="cancel" class="btn ghost">취소</button><button id="btn-text-ok" value="ok" class="btn primary">줄로 만들기</button></div>
+  </form>
+</dialog>
+
+<!-- 필기 대화상자 -->
+<dialog id="dlg-draw">
+  <div class="dlg">
+    <h2>필기로 입력</h2>
+    <canvas id="draw-canvas" width="1200" height="600" aria-label="필기 영역"></canvas>
+    <div class="row between">
+      <div class="row"><button id="draw-undo" class="btn ghost">되돌리기</button><button id="draw-clear" class="btn ghost">지우기</button></div>
+      <div class="row"><button id="draw-cancel" class="btn ghost">취소</button><button id="draw-ok" class="btn primary">인식</button></div>
+    </div>
+  </div>
+</dialog>
+
+<div id="toast" class="toast" role="alert" hidden></div>
+
+<script src="vendor/katex/katex.min.js"></script>
+<script type="module" src="src/app.js"></script>
+</body>
+</html>
